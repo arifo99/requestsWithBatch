@@ -60,28 +60,27 @@ def request(method, url, **kwargs):
     with sessions.Session() as session:
         return session.request(method=method, url=url, **kwargs)
 
-async def asyncGet(url, **kwargs):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, **kwargs) as resp:
+async def asyncGet(session, url, **kwargs):
+    async with session.get(url, **kwargs) as resp:
             resp.text = await resp.text()
             return resp
 
-async def asyncPost(url, **kwargs):
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data) as resp:
+async def asyncPost(session, url, **kwargs):
+    async with session.post(url, data) as resp:
             resp.text = await resp.text()
             return resp
 
 async def asyncBatch(reqs):
-    tasks = []
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        
+        for req in reqs:
+            if(req['method'] == "GET"):
+                tasks.append(asyncio.ensure_future(asyncGet(session, req['url'], **req['kwargs'])))
+            elif(req['method'] == "POST"):
+                tasks.append(asyncio.ensure_future(asyncPost(session, req['url'], **req['kwargs'])))
 
-    for req in reqs:
-        if(req['method'] == "GET"):
-            tasks.append(asyncio.ensure_future(asyncGet(req['url'], **req['kwargs'])))
-        elif(req['method'] == "POST"):
-            tasks.append(asyncio.ensure_future(asyncPost(req['url'], **req['kwargs'])))
-
-    return await asyncio.gather(*tasks)
+        return await asyncio.gather(*tasks)
 
 def batch(reqs):
     loop = asyncio.get_event_loop()
